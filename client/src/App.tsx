@@ -1,5 +1,5 @@
 import "./App.css";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const App: React.FC = () => {
@@ -8,6 +8,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [newWordAdded, setNewWordAdded] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<any>(null); // State to hold statistics data
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = event.target.value;
@@ -41,6 +42,21 @@ const App: React.FC = () => {
     }
     setLoading(false);
   };
+
+  const fetchStats = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get('/api/v1/stats');
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchStats(); // Fetch stats on component mount
+  }, []); // Empty dependency array to run only once on mount
 
   return (
     <div className="container">
@@ -76,7 +92,18 @@ const App: React.FC = () => {
         <button className="add-word-button" onClick={addNewWord} disabled={loading || !word}>
           Add Word
         </button>
+        <button onClick={fetchStats} disabled={loading}>
+          Get Stats
+        </button>
       </div>
+      {stats && (
+        <div>
+          <h2>Statistics:</h2>
+          <p>Total Words: {stats.totalWords}</p>
+          <p>Total Requests: {stats.totalRequests}</p>
+          <p>Average Processing Time (ms): {stats.avgProcessingTimeMs}</p>
+        </div>
+      )}
     </div>
   );
 };

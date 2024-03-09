@@ -10,10 +10,12 @@ app.use(cors());
 
 app.use(bodyParser.json());
 
+let bl;
+
 (async () => {
   const dal = new DataAccessLayer();
   await dal.initDal();
-  const bl = new BusinessLogicLayer(dal);
+  bl = new BusinessLogicLayer(dal);
 
   app.listen(5000, () => console.log("Server is running on port 5000"));
 })();
@@ -28,7 +30,7 @@ app.get("/", async (req, res) => {
 app.get("/api/v1/similar", async (req, res) => {
   const start = process.hrtime();
   const timestamp = new Date();
-  const { word } = req.body;
+  const { word } = req.query;
   let similarWords;
 
   if (!word) {
@@ -112,7 +114,7 @@ app.get("/api/v1/stats", async (req, res) => {
  */
 function getDurationMicroseconds(start) {
   const finish = process.hrtime(start);
-  const microseconds = finish[0] * 1e6 + finish[1] / 1e3;
+  const microseconds = parseInt(finish[0] * 1e6 + finish[1] / 1e3);
   return microseconds;
 }
 

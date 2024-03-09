@@ -8,7 +8,7 @@ class BusinessLogicLayer {
   async getSimilarWords(word) {
     let similarWords = [];
     // Checks wether word alphabetical key exists in the dictionary.
-    const key = sortWordAlphabetically(word);
+    const key = this.sortWordAlphabetically(word);
     const keyFound = await this.dal.findKey(key);
     if (!keyFound) {
       return similarWords;
@@ -39,13 +39,13 @@ class BusinessLogicLayer {
     let avgProcessingTimeMs = 0;
 
     let statistics = await this.dal.getStatistics(from, to); // <Array<{ request_duration: number, timestamp: Date }>>
-    totalWords = await getDictionarySize();
+    totalWords = await this.getDictionarySize();
     totalRequests = statistics.length;
     const totalDuration = statistics.reduce(
       (total, stat) => total + stat.request_duration,
       0
     );
-    avgProcessingTimeMs = totalDuration / totalRequests;
+    avgProcessingTimeMs = parseInt(totalDuration / totalRequests);
 
     return {
       totalWords,

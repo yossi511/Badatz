@@ -1,17 +1,20 @@
 const { Pool } = require("pg");
+const fs = require("fs");
 const CustomError = require("../helpers/customError");
+const path = require("path");
+
 let keys = require("./dbConfig");
-const WORDS_DATASET_PATH = "../data/words_dataset.txt";
+const WORDS_DATASET_PATH = path.resolve(__dirname, "../data/words_dataset.txt");
 
 class DataAccessLayer {
   constructor() {
     keys = {
-      pgUser: 'postgres',
-      pgHost: 'postgres',
-      pgDatabase: 'postgres',
-      pgPassword: 'admin',
+      pgUser: "postgres",
+      pgHost: "localhost",
+      pgDatabase: "postgres",
+      pgPassword: "admin",
       pgPort: 5433,
-    }
+    };
     this.pool = new Pool({
       user: keys.pgUser,
       host: keys.pgHost,
@@ -100,7 +103,7 @@ class DataAccessLayer {
     try {
       const createWordsQuery = `
           CREATE TABLE words (
-            key PRIMARY TEXT,
+            key TEXT PRIMARY KEY,
             words_list TEXT[]
           );
       `;
@@ -109,7 +112,8 @@ class DataAccessLayer {
       const createStatsQuery = `
           CREATE TABLE stats (
             request_duration INTEGER,
-            timestamp TIMESTAMP
+            timestamp TIMESTAMP,
+            PRIMARY KEY (request_duration, timestamp)
           );
       `;
       await client.query(createStatsQuery);
@@ -125,18 +129,66 @@ class DataAccessLayer {
    */
   async initWordsDb() {
     try {
-      const fileStream = fs.createReadStream(WORDS_DATASET_PATH);
-      const rl = readline.createInterface({
-        input: fileStream,
-        crlfDelay: Infinity,
-      });
-
-      for await (const line of rl) {
-        const word = "".join(line); // TODO: Check this.
-        await this.addWord(word);
-      }
+      const data = fs.readFileSync(WORDS_DATASET_PATH, "utf8");
+      const words = data.split("\r\n");
+      const dictionary = words.reduce((dict, currentWord) => {
+        const key = this.sortWordAlphabetically(currentWord);
+        if (!dict.hasOwnProperty(key)) {
+          dict[key] = [];
+        }
+        dict[key].push(currentWord);
+        return dict;
+      }, {});
+      await this.addWordsBulk(dictionary);
     } catch (error) {
       console.error("Error initializing database:", error);
+    }
+  }
+
+  //TODO: Maybe useless
+  async addWords(key, words) {
+    const client = await this.pool.connect();
+    try {
+      const query =
+        "INSERT INTO words (key, words_list) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET words_list = $2";
+      await client.query(query, [key, `{${words.join(",")}}`]);
+    } catch (error) {
+      console.error("Error adding words to key in table:", error);
+      throw new CustomError("CRUD", "Error adding words to key in table");
+    } finally {
+      client.release();
+    }
+  }
+
+  //TODO: JSDOC this
+  async addWordsBulk(dictionary) {
+    const client = await this.pool.connect();
+    try {
+      const batchSize = 50000;
+      const keys = Object.keys(dictionary);
+      const totalKeys = keys.length;
+      let index = 0;
+      while (index < totalKeys) {
+        const batchKeys = keys.slice(index, index + batchSize);
+        await client.query("BEGIN");
+        const values = [];
+        for (const key of batchKeys) {
+          values.push(`('${key}', '{${dictionary[key].join(",")}}')`);
+        }
+        const query =
+          "INSERT INTO words (key, words_list) VALUES " +
+          values.join(", ") +
+          " ON CONFLICT (key) DO UPDATE SET words_list = EXCLUDED.words_list";
+        await client.query(query, []);
+        await client.query("COMMIT");
+        index += batchSize;
+      }
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error adding words to keys in table:", error);
+      throw new CustomError("CRUD", "Error adding words to keys in table");
+    } finally {
+      client.release();
     }
   }
 
@@ -149,6 +201,7 @@ class DataAccessLayer {
       await this.createDatabases();
       await this.initWordsDb();
     } else {
+      //TODO: maybe useless
       const wordsCount = (await this.read("words")).length;
       if (wordsCount == 0) await this.initWordsDb();
     }
@@ -161,7 +214,7 @@ class DataAccessLayer {
   async addWord(word) {
     const client = await this.pool.connect();
     try {
-      const key = sortWordAlphabetically(word);
+      const key = this.sortWordAlphabetically(word);
       const query =
         "UPDATE words SET words_list = array_append(words_list, $2) WHERE key = $1";
       await client.query(query, [key, word]);
@@ -181,7 +234,7 @@ class DataAccessLayer {
   async findWord(word) {
     const client = await this.pool.connect();
     try {
-      const key = sortWordAlphabetically(word);
+      const key = this.sortWordAlphabetically(word);
       const query =
         "SELECT EXISTS (SELECT 1 FROM words WHERE key = $1 AND $2 = ANY(words_list)) AS exists";
       const result = await client.query(query, [key, word]);
@@ -199,7 +252,7 @@ class DataAccessLayer {
    * @returns {Promise<number>} - Total size of the dictionary.
    */
   async getDictionarySize() {
-    const client = await pool.connect();
+    const client = await this.pool.connect();
     try {
       const query =
         "SELECT SUM(ARRAY_LENGTH(words_list, 1)) AS total_size FROM words";
@@ -242,9 +295,9 @@ class DataAccessLayer {
   async getSimilarWords(key) {
     const client = await this.pool.connect();
     try {
-      const query = "SELECT word_list FROM words WHERE key = $1";
+      const query = "SELECT words_list FROM words WHERE key = $1";
       const result = await client.query(query, [key]);
-      return result.rows[0].word_list;
+      return result.rows[0].words_list;
     } catch (error) {
       console.error("Error retrieving word list for key:", error);
       throw new CustomError("CRUD", "Error retrieving similar words for key");
@@ -267,7 +320,7 @@ class DataAccessLayer {
       console.log("Statistic added successfully");
     } catch (error) {
       console.error("Error adding statistic:", error);
-      throw new CustomError("CRUD", "Error adding statistic");
+      throw new CustomError("CRUD", 'Error adding statistic');
     } finally {
       client.release();
     }
