@@ -2,7 +2,11 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const bodyParser = require("body-parser");
-
+const {
+  getDurationMicroseconds,
+  validateDateRange,
+  validateWord,
+} = require("./helpers/miscHelpers");
 const BusinessLogicLayer = require("./bl/businessLogicLayer");
 const DataAccessLayer = require("./dal/dataAccessLayer");
 
@@ -21,7 +25,7 @@ let bl;
 })();
 
 app.get("/", async (req, res) => {
-  res.status(200).send('Me running fast - DELETE ME BEFORE SUBMIT');
+  res.status(200).send("Me running fast - DELETE ME BEFORE SUBMIT");
 });
 
 /**
@@ -33,10 +37,10 @@ app.get("/api/v1/similar", async (req, res) => {
   const { word } = req.query;
   let similarWords;
 
-  if (!word) {
+  if (!validateWord(word)) {
     return res.status(400).json({
       type: "Validation",
-      error: "Word parameter is required in the request body",
+      error: "word parameter is missing/invalid.",
     });
   }
 
@@ -44,12 +48,11 @@ app.get("/api/v1/similar", async (req, res) => {
     similarWords = await bl.getSimilarWords(word);
     const requestDuration = getDurationMicroseconds(start);
     await bl.addStatistic(requestDuration, timestamp);
+    res.json({ similar: similarWords });
   } catch (error) {
     return res
       .status(400)
       .json({ type: error.type ?? "", error: error.message });
-  } finally {
-    res.json({ similar: similarWords });
   }
 });
 
@@ -59,21 +62,20 @@ app.get("/api/v1/similar", async (req, res) => {
 app.post("/api/v1/add-word", async (req, res) => {
   const { word } = req.body;
 
-  if (!word) {
+  if (!validateWord(word)) {
     return res.status(400).json({
       type: "Validation",
-      error: "Word parameter is required in the request body",
+      error: "word parameter is missing/invalid.",
     });
   }
 
   try {
     await bl.addWord(word);
+    res.status(200).send(`${word} added to the dictionary successfully!`);
   } catch (error) {
     return res
       .status(400)
       .json({ type: error.type ?? "", error: error.message });
-  } finally {
-    res.status(200).send(`${word} added to the dictionary successfully!`);
   }
 });
 
@@ -87,56 +89,16 @@ app.get("/api/v1/stats", async (req, res) => {
   if (!validateDateRange(from, to)) {
     return res.status(400).json({
       type: "Validation",
-      error: "Range parameters 'from' or 'to' are invalid.",
+      error: "Time filter is partially missing/invalid.",
     });
   }
 
   try {
     statistics = await bl.getStatistics(from, to);
+    res.json(statistics);
   } catch (error) {
     return res
       .status(400)
       .json({ type: error.type ?? "", error: error.message });
-  } finally {
-    res.json(statistics);
   }
-  res.json({
-    totalWords: dictionary.length,
-    totalRequests,
-    avgProcessingTimeMs: avgProcessingTime,
-  });
 });
-
-/**
- * Calculates the elapsed time in microseconds since the specified start time.
- * @param {Array<number>} start - The start time captured.
- * @returns {number} The elapsed time in microseconds.
- */
-function getDurationMicroseconds(start) {
-  const finish = process.hrtime(start);
-  const microseconds = parseInt(finish[0] * 1e6 + finish[1] / 1e3);
-  return microseconds;
-}
-
-function validateDateRange(from, to) {
-  const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-
-  // Check if both from and to are undefined
-  if (from === undefined && to === undefined) {
-    return true;
-  }
-
-  // If either from or to is missing or not in the correct format, return false
-  if (
-    from === undefined ||
-    to === undefined ||
-    !dateRegex.test(from) ||
-    !dateRegex.test(to)
-  ) {
-    return false;
-  }
-
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
-  return fromDate < toDate;
-}

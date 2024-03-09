@@ -1,32 +1,49 @@
 import "./App.css";
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from "react";
+import axios from "axios";
+
+enum State {
+  SIMILAR,
+  ADD_WORD,
+  STATS,
+  NONE
+}
 
 const App: React.FC = () => {
-  const [word, setWord] = useState<string>('');
+  const [word, setWord] = useState<string>("");
   const [similarWords, setSimilarWords] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [newWordAdded, setNewWordAdded] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null); // State to hold statistics data
+  const [stats, setStats] = useState<any>(null);
+  const [state, setState] = useState<State>(State.NONE);
+  
+  const isValidWord = (word: string) => {
+    return /^[a-zA-Z]+$/.test(word) || word === "";
+  };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = event.target.value;
-    if (/^[a-zA-Z]+$/.test(inputValue) || inputValue === '') {
-      setWord(inputValue);
+    setWord(inputValue);
+    if (isValidWord(inputValue)) {
       setError(null);
     } else {
-      setError('Input must contain only letters');
+      setError("Input must contain only letters");
+      setState(State.NONE);
     }
   };
 
   const fetchSimilarWords = async () => {
     setLoading(true);
     try {
-      const response = await axios.get<{ similar: string[] }>(`/api/v1/similar?word=${word}`);
+      const response = await axios.get<{ similar: string[] }>(
+        `http://localhost:5000/api/v1/similar?word=${word}`
+      );
       setSimilarWords(response.data.similar);
+      setState(State.SIMILAR);
     } catch (error) {
-      console.error('Error fetching similar words:', error);
+      console.error("Error fetching similar words:", error);
+      setState(State.NONE);
     }
     setLoading(false);
   };
@@ -34,11 +51,12 @@ const App: React.FC = () => {
   const addNewWord = async () => {
     setLoading(true);
     try {
-      await axios.post('/api/v1/add-word', { word });
-      setNewWordAdded(true);
-      setWord('');
+      await axios.post("http://localhost:5000/api/v1/add-word", { word });
+      setState(State.ADD_WORD);
+      setWord("");
     } catch (error) {
-      console.error('Error adding new word:', error);
+      console.error("Error adding new word:", error);
+      setState(State.NONE);
     }
     setLoading(false);
   };
@@ -46,17 +64,15 @@ const App: React.FC = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/v1/stats');
+      const response = await axios.get("http://localhost:5000/api/v1/stats");
       setStats(response.data);
+      setState(State.STATS);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error("Error fetching stats:", error);
+      setState(State.NONE);
     }
     setLoading(false);
   };
-
-  useEffect(() => {
-    fetchStats(); // Fetch stats on component mount
-  }, []); // Empty dependency array to run only once on mount
 
   return (
     <div className="container">
@@ -72,31 +88,37 @@ const App: React.FC = () => {
         {error && <p className="error-message">{error}</p>}
       </div>
       {loading && <p>Loading...</p>}
-      {similarWords.length > 0 && (
+      {state === State.SIMILAR && similarWords.length > 0 && (
         <div>
           <h2>Similar Words:</h2>
           <ul>
             {similarWords.map((similarWord) => (
-              <li className="similar-word" key={similarWord}>{similarWord}</li>
+              <li className="similar-word" key={similarWord}>
+                {similarWord}
+              </li>
             ))}
           </ul>
         </div>
       )}
-      {newWordAdded && (
+      {state === State.ADD_WORD && (
         <p className="success-message">New word added successfully!</p>
       )}
       <div className="button-container">
         <button onClick={fetchSimilarWords} disabled={loading}>
           Find Similar Words
         </button>
-        <button className="add-word-button" onClick={addNewWord} disabled={loading || !word}>
+        <button
+          className="add-word-button"
+          onClick={addNewWord}
+          disabled={loading || !isValidWord(word)}
+        >
           Add Word
         </button>
         <button onClick={fetchStats} disabled={loading}>
           Get Stats
         </button>
       </div>
-      {stats && (
+      {state === State.STATS && (
         <div>
           <h2>Statistics:</h2>
           <p>Total Words: {stats.totalWords}</p>

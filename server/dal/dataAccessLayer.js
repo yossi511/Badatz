@@ -25,50 +25,6 @@ class DataAccessLayer {
   }
 
   /**
-   * Checks if a database exists in the PostgreSQL server.
-   * @param {string} databaseName - The name of the database to check for existence.
-   * @returns {Promise<boolean>} - Boolean indicating whether the database exists or not.
-   */
-  async checkDatabaseExists(databaseName) {
-    const client = await this.pool.connect();
-    try {
-      const query = `
-        SELECT EXISTS (
-          SELECT datname FROM pg_catalog.pg_database WHERE datname = $1
-        ) AS exists;
-      `;
-      const result = await client.query(query, [databaseName]);
-      return result.rows[0].exists;
-    } catch (error) {
-      console.error("Error checking database existence:", error);
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
-   * Checks if a table exists in the database.
-   * @param {string} tableName - The name of the table to check for existence.
-   * @returns {Promise<boolean>} - Boolean indicating whether the table exists or not.
-   */
-  async checkTableExists(tableName) {
-    const client = await this.pool.connect();
-    try {
-      const query = `
-        SELECT EXISTS (
-          SELECT relname FROM pg_class WHERE relname = $1
-        ) AS exists;
-      `;
-      const result = await client.query(query, [tableName]);
-      return result.rows[0].exists;
-    } catch (error) {
-      console.error("Error checking table existence:", error);
-    } finally {
-      client.release();
-    }
-  }
-
-  /**
    * Checks if tables ('words' and 'stats') exist in the database.
    * @returns {Promise<boolean>} - Boolean indicating whether both tables exist or not.
    */
@@ -317,7 +273,7 @@ class DataAccessLayer {
       const query =
         "INSERT INTO stats (request_duration, timestamp) VALUES ($1, $2)";
       await client.query(query, [requestDuration, timestamp]);
-      console.log("Statistic added successfully");
+      console.log("Statistic added successfully");// TODO: handle too
     } catch (error) {
       console.error("Error adding statistic:", error);
       throw new CustomError("CRUD", 'Error adding statistic');
