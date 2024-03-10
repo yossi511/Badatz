@@ -265,7 +265,6 @@ class DataAccessLayer {
       const query =
         "INSERT INTO stats (request_duration, timestamp) VALUES ($1, $2)";
       await client.query(query, [requestDuration, timestamp]);
-      console.log("Statistic added successfully"); // TODO: handle too
     } catch (error) {
       console.error("Error adding statistic:", error);
       throw new CustomError("CRUD", "Error adding statistic");
