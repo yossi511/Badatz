@@ -10,13 +10,13 @@ const WORDS_DATASET_PATH = path.resolve(__dirname, "../data/words_dataset.txt");
 class DataAccessLayer {
   constructor() {
     // TODO: Update when comes to docker.
-    keys = {
-      pgUser: "postgres",
-      pgHost: "localhost",
-      pgDatabase: "postgres",
-      pgPassword: "admin",
-      pgPort: 5433,
-    };
+    // keys = {
+    //   pgUser: "postgres",
+    //   pgHost: "localhost",
+    //   pgDatabase: "postgres",
+    //   pgPassword: "admin",
+    //   pgPort: 5433,
+    // };
     this.pool = new Pool({
       user: keys.pgUser,
       host: keys.pgHost,

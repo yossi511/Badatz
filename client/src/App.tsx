@@ -9,11 +9,11 @@ enum State {
   NONE
 }
 
+// TODO: Check states and flow and conduct more tests on add word.
 const App: React.FC = () => {
   const [word, setWord] = useState<string>("");
   const [similarWords, setSimilarWords] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [newWordAdded, setNewWordAdded] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [state, setState] = useState<State>(State.NONE);
@@ -37,7 +37,7 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const response = await axios.get<{ similar: string[] }>(
-        `http://localhost:5000/api/v1/similar?word=${word}`
+        `/api/v1/similar?word=${word}`
       );
       setSimilarWords(response.data.similar);
       setState(State.SIMILAR);
@@ -51,7 +51,7 @@ const App: React.FC = () => {
   const addNewWord = async () => {
     setLoading(true);
     try {
-      await axios.post("http://localhost:5000/api/v1/add-word", { word });
+      await axios.post("/api/v1/add-word", { word });
       setState(State.ADD_WORD);
       setWord("");
     } catch (error) {
@@ -64,7 +64,7 @@ const App: React.FC = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:5000/api/v1/stats");
+      const response = await axios.get("/api/v1/stats");
       setStats(response.data);
       setState(State.STATS);
     } catch (error) {

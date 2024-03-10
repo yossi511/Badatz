@@ -7,33 +7,21 @@ services:
   nginx:
     depends_on:
       - api
-      - client
     restart: always
     build:
-      dockerfile: Dockerfile.dev
-      context: ./nginx
+      dockerfile: Dockerfile
+      context: ./client
     ports:
-      - "3050:80"
+      - "3060:80"
   api:
+    deploy:
+      replicas: 3
     build:
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
       context: "./server"
-    volumes:
-      - /app/node_modules
-      - ./server:/app
     environment:
       - PGUSER=postgres
       - PGHOST=postgres
       - PGDATABASE=postgres
       - PGPASSWORD=admin
       - PGPORT=5432
-  client:
-    stdin_open: true
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-    build:
-      dockerfile: Dockerfile.dev
-      context: ./client
-    volumes:
-      - /app/node_modules
-      - ./client:/app
