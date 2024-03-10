@@ -3,6 +3,17 @@
  */
 
 /**
+ * Sort and re-write the word to the aplhabetical permutation order.
+ * @param {string} word
+ */
+function sortWordAlphabetically(word) {
+  let wordChars = word.split("");
+  wordChars.sort();
+  let sortedWord = wordChars.join("");
+  return sortedWord;
+}
+
+/**
  * Calculates the elapsed time in microseconds since the specified start time.
  * @param {Array<number>} start - The start time captured.
  * @returns {number} The elapsed time in microseconds.
@@ -56,4 +67,9 @@ function validateWord(word) {
   return regex.test(word);
 }
 
-module.exports = { getDurationMicroseconds, validateDateRange, validateWord };
+module.exports = {
+  sortWordAlphabetically,
+  getDurationMicroseconds,
+  validateDateRange,
+  validateWord,
+};

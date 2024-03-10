@@ -1,4 +1,5 @@
 const CustomError = require("../helpers/customError");
+const { sortWordAlphabetically } = require("../helpers/miscHelpers");
 
 class BusinessLogicLayer {
   constructor(dataAccessLayer) {
@@ -8,7 +9,7 @@ class BusinessLogicLayer {
   async getSimilarWords(word) {
     let similarWords = [];
     // Checks wether word alphabetical key exists in the dictionary.
-    const key = this.sortWordAlphabetically(word);
+    const key = sortWordAlphabetically(word);
     const keyFound = await this.dal.findKey(key);
     if (!keyFound) {
       return similarWords;
@@ -34,18 +35,14 @@ class BusinessLogicLayer {
   }
 
   async getStatistics(from = null, to = null) {
-    let totalWords = 0;
-    let totalRequests = 0;
-    let avgProcessingTimeMs = 0;
-
-    let statistics = await this.dal.getStatistics(from, to); // <Array<{ request_duration: number, timestamp: Date }>>
-    totalWords = await this.getDictionarySize();
-    totalRequests = statistics.length;
+    let statistics = await this.dal.getStatistics(from, to);
+    const totalWords = await this.getDictionarySize();
+    const totalRequests = statistics.length;
     const totalDuration = statistics.reduce(
       (total, stat) => total + stat.request_duration,
       0
     );
-    avgProcessingTimeMs = parseInt(totalDuration / totalRequests);
+    const avgProcessingTimeMs = parseInt(totalDuration / totalRequests);
 
     return {
       totalWords,
@@ -57,13 +54,6 @@ class BusinessLogicLayer {
   async getDictionarySize() {
     const dictionarySize = await this.dal.getDictionarySize();
     return dictionarySize;
-  }
-
-  sortWordAlphabetically(word) {
-    let wordChars = word.split("");
-    wordChars.sort();
-    let sortedWord = wordChars.join("");
-    return sortedWord;
   }
 }
 

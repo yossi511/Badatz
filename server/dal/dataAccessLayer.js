@@ -1,6 +1,7 @@
 const { Pool } = require("pg");
 const fs = require("fs");
 const CustomError = require("../helpers/customError");
+const { sortWordAlphabetically } = require("../helpers/miscHelpers");
 const path = require("path");
 
 let keys = require("./dbConfig");
@@ -8,6 +9,7 @@ const WORDS_DATASET_PATH = path.resolve(__dirname, "../data/words_dataset.txt");
 
 class DataAccessLayer {
   constructor() {
+    // TODO: Update when comes to docker.
     keys = {
       pgUser: "postgres",
       pgHost: "localhost",
@@ -87,37 +89,28 @@ class DataAccessLayer {
     try {
       const data = fs.readFileSync(WORDS_DATASET_PATH, "utf8");
       const words = data.split("\r\n");
+      // Sorts word into dictionary - (<alphabetical key>:[<words>])
       const dictionary = words.reduce((dict, currentWord) => {
-        const key = this.sortWordAlphabetically(currentWord);
+        const key = sortWordAlphabetically(currentWord);
         if (!dict.hasOwnProperty(key)) {
           dict[key] = [];
         }
         dict[key].push(currentWord);
         return dict;
       }, {});
-      await this.addWordsBulk(dictionary);
+      await this.initDictionary(dictionary);
     } catch (error) {
       console.error("Error initializing database:", error);
     }
   }
 
-  //TODO: Maybe useless
-  async addWords(key, words) {
-    const client = await this.pool.connect();
-    try {
-      const query =
-        "INSERT INTO words (key, words_list) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET words_list = $2";
-      await client.query(query, [key, `{${words.join(",")}}`]);
-    } catch (error) {
-      console.error("Error adding words to key in table:", error);
-      throw new CustomError("CRUD", "Error adding words to key in table");
-    } finally {
-      client.release();
-    }
-  }
-
-  //TODO: JSDOC this
-  async addWordsBulk(dictionary) {
+  /**
+ * Initializes the dictionary by slitting the dict into batches,
+ * The dictionary is sorted beforhand by alphabetical keys.
+ * @param {Object.<string, string[]>} dictionary - The dictionary object where keys are words and values are arrays of related words.
+ * @returns {Promise<void>} - A Promise that resolves when all words are added successfully.
+ */
+  async initDictionary(dictionary) {
     const client = await this.pool.connect();
     try {
       const batchSize = 50000;
@@ -157,7 +150,6 @@ class DataAccessLayer {
       await this.createDatabases();
       await this.initWordsDb();
     } else {
-      //TODO: maybe useless
       const wordsCount = (await this.read("words")).length;
       if (wordsCount == 0) await this.initWordsDb();
     }
@@ -170,7 +162,7 @@ class DataAccessLayer {
   async addWord(word) {
     const client = await this.pool.connect();
     try {
-      const key = this.sortWordAlphabetically(word);
+      const key = sortWordAlphabetically(word);
       const query =
         "UPDATE words SET words_list = array_append(words_list, $2) WHERE key = $1";
       await client.query(query, [key, word]);
@@ -190,7 +182,7 @@ class DataAccessLayer {
   async findWord(word) {
     const client = await this.pool.connect();
     try {
-      const key = this.sortWordAlphabetically(word);
+      const key = sortWordAlphabetically(word);
       const query =
         "SELECT EXISTS (SELECT 1 FROM words WHERE key = $1 AND $2 = ANY(words_list)) AS exists";
       const result = await client.query(query, [key, word]);
@@ -273,10 +265,10 @@ class DataAccessLayer {
       const query =
         "INSERT INTO stats (request_duration, timestamp) VALUES ($1, $2)";
       await client.query(query, [requestDuration, timestamp]);
-      console.log("Statistic added successfully");// TODO: handle too
+      console.log("Statistic added successfully"); // TODO: handle too
     } catch (error) {
       console.error("Error adding statistic:", error);
-      throw new CustomError("CRUD", 'Error adding statistic');
+      throw new CustomError("CRUD", "Error adding statistic");
     } finally {
       client.release();
     }
@@ -309,17 +301,6 @@ class DataAccessLayer {
     }
   }
 
-  /**
-   * Sort and re-write the word to the aplhabetical permutation order.
-   * @param {string} word
-   */
-  sortWordAlphabetically(word) {
-    let wordChars = word.split("");
-    wordChars.sort();
-    let sortedWord = wordChars.join("");
-    return sortedWord;
-  }
-
   async create(table, data) {
     const client = await this.pool.connect();
     try {
@@ -327,7 +308,7 @@ class DataAccessLayer {
       const values = Object.values(data)
         .map((val) => `'${val}'`)
         .join(", ");
-      const query = `INSERT INTO ${table} (${columns}, timestamp) VALUES (${values}, NOW()) RETURNING *`;
+      const query = `INSERT INTO ${table} (${columns}) VALUES (${values}) RETURNING *`;
       const result = await client.query(query);
       return result.rows[0];
     } finally {
@@ -335,12 +316,15 @@ class DataAccessLayer {
     }
   }
 
-  async read(table, condition = "") {
+  async read(table, condition = "", values, customError) {
     const client = await this.pool.connect();
     try {
       const query = `SELECT * FROM ${table} ${condition}`;
-      const result = await client.query(query);
+      const result = await client.query(query, values);
       return result.rows;
+    } catch (error) {
+      console.error(`${customError.message}:`, error);
+      throw customError;
     } finally {
       client.release();
     }
