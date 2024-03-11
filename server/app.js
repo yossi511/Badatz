@@ -24,8 +24,8 @@ let bl;
   app.listen(5000, () => console.log("Server is running on port 5000"));
 })();
 
-app.get("/", async (req, res) => {
-  res.status(200).send("Me running fast - DELETE ME BEFORE SUBMIT");
+app.get("/", (req, res) => {
+  res.status(200).send("IM UP");
 });
 
 /**

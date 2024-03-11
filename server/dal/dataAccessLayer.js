@@ -9,14 +9,6 @@ const WORDS_DATASET_PATH = path.resolve(__dirname, "../data/words_dataset.txt");
 
 class DataAccessLayer {
   constructor() {
-    // TODO: Update when comes to docker.
-    // keys = {
-    //   pgUser: "postgres",
-    //   pgHost: "localhost",
-    //   pgDatabase: "postgres",
-    //   pgPassword: "admin",
-    //   pgPort: 5433,
-    // };
     this.pool = new Pool({
       user: keys.pgUser,
       host: keys.pgHost,
@@ -163,8 +155,7 @@ class DataAccessLayer {
     const client = await this.pool.connect();
     try {
       const key = sortWordAlphabetically(word);
-      const query =
-        "UPDATE words SET words_list = array_append(words_list, $2) WHERE key = $1";
+      const query = "INSERT INTO words (key, words_list) VALUES ($1, ARRAY[$2]) ON CONFLICT (key) DO UPDATE SET words_list = array_append(words.words_list, $2)";
       await client.query(query, [key, word]);
     } catch (error) {
       console.error("Error adding word to words table:", error);
@@ -284,7 +275,7 @@ class DataAccessLayer {
     try {
       let query = "SELECT request_duration, timestamp FROM stats";
 
-      const values = [];
+      let values = [];
       if (from !== null && to !== null) {
         query += " WHERE timestamp >= $1 AND timestamp <= $2";
         values = [from, to];
@@ -295,60 +286,6 @@ class DataAccessLayer {
     } catch (error) {
       console.error("Error retrieving statistics:", error);
       throw new CustomError("CRUD", "Error retrieving statistics");
-    } finally {
-      client.release();
-    }
-  }
-
-  async create(table, data) {
-    const client = await this.pool.connect();
-    try {
-      const columns = Object.keys(data).join(", ");
-      const values = Object.values(data)
-        .map((val) => `'${val}'`)
-        .join(", ");
-      const query = `INSERT INTO ${table} (${columns}) VALUES (${values}) RETURNING *`;
-      const result = await client.query(query);
-      return result.rows[0];
-    } finally {
-      client.release();
-    }
-  }
-
-  async read(table, condition = "", values, customError) {
-    const client = await this.pool.connect();
-    try {
-      const query = `SELECT * FROM ${table} ${condition}`;
-      const result = await client.query(query, values);
-      return result.rows;
-    } catch (error) {
-      console.error(`${customError.message}:`, error);
-      throw customError;
-    } finally {
-      client.release();
-    }
-  }
-
-  async update(table, id, data) {
-    const client = await this.pool.connect();
-    try {
-      const updates = Object.entries(data)
-        .map(([key, val]) => `${key} = '${val}'`)
-        .join(", ");
-      const query = `UPDATE ${table} SET ${updates} WHERE id = ${id} RETURNING *`;
-      const result = await client.query(query);
-      return result.rows[0];
-    } finally {
-      client.release();
-    }
-  }
-
-  async delete(table, id) {
-    const client = await this.pool.connect();
-    try {
-      const query = `DELETE FROM ${table} WHERE id = ${id} RETURNING *`;
-      const result = await client.query(query);
-      return result.rows[0];
     } finally {
       client.release();
     }
