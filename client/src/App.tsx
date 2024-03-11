@@ -1,6 +1,6 @@
 import "./App.css";
 import React, { useState } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
 enum State {
   SIMILAR,
@@ -9,11 +9,11 @@ enum State {
   NONE
 }
 
-// TODO: Check states and flow and conduct more tests on add word.
 const App: React.FC = () => {
   const [word, setWord] = useState<string>("");
   const [similarWords, setSimilarWords] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [addWordMessage, setAddWordMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [state, setState] = useState<State>(State.NONE);
@@ -51,11 +51,12 @@ const App: React.FC = () => {
   const addNewWord = async () => {
     setLoading(true);
     try {
-      await axios.post("/api/v1/add-word", { word });
+      const response = await axios.post("/api/v1/add-word", { word });
+      setAddWordMessage(response.data);
       setState(State.ADD_WORD);
       setWord("");
-    } catch (error) {
-      console.error("Error adding new word:", error);
+    } catch (error: any) {
+      setError(error.response.data.error);
       setState(State.NONE);
     }
     setLoading(false);
@@ -101,7 +102,7 @@ const App: React.FC = () => {
         </div>
       )}
       {state === State.ADD_WORD && (
-        <p className="success-message">New word added successfully!</p>
+        <p className="success-message">{addWordMessage}</p>
       )}
       <div className="button-container">
         <button onClick={fetchSimilarWords} disabled={loading}>
